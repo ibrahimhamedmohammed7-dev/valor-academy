@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VALOR Founder Dashboard</title>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#07100d;
+  color:#fff;
+}
+.container{
+  max-width:1100px;
+  margin:auto;
+  padding:25px;
+}
+.card{
+  background:#0c1713;
+  border:1px solid #18352a;
+  border-radius:18px;
+  padding:22px;
+  margin-bottom:20px;
+}
+h1,h2{margin-top:0}
+input,button{
+  width:100%;
+  padding:14px;
+  margin:7px 0;
+  border-radius:10px;
+  border:1px solid #28513e;
+  font-size:15px;
+}
+input{
+  background:#07100d;
+  color:#fff;
+}
+button{
+  background:#16A34A;
+  color:white;
+  border:0;
+  font-weight:bold;
+  cursor:pointer;
+}
+button:hover{opacity:.9}
+.logout{background:#991b1b}
+.hidden{display:none}
+.course{
+  border:1px solid #244c39;
+  border-radius:14px;
+  padding:15px;
+  margin:10px 0;
+}
+.status{
+  padding:10px;
+  border-radius:10px;
+  background:#10211a;
+  margin-bottom:15px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<!-- LOGIN -->
+<div id="loginBox" class="card">
+  <h1>VALOR ORGANIZATION</h1>
+  <h2>Founder Login</h2>
+  <p>تسجيل دخول Founder & Owner</p>
+
+  <input id="email" type="email" placeholder="البريد الإلكتروني">
+  <input id="password" type="password" placeholder="كلمة المرور">
+
+  <button onclick="login()">دخول Founder</button>
+
+  <div id="loginStatus" class="status"></div>
+</div>
+
+
+<!-- DASHBOARD -->
+<div id="dashboard" class="hidden">
+
+  <div class="card">
+    <h1>🔥 VALOR Founder Dashboard</h1>
+    <p>Founder & Owner — IBRAHIM HAMED</p>
+
+    <button class="logout" onclick="logout()">تسجيل الخروج</button>
+  </div>
+
+
+  <div class="card">
+    <h2>📚 إضافة كورس جديد</h2>
+
+    <input id="courseTitle" placeholder="اسم الكورس">
+    <input id="courseDescription" placeholder="وصف الكورس">
+    <input id="courseImage" placeholder="رابط صورة الكورس">
+    <input id="coursePrice" type="number" placeholder="السعر بالجنيه">
+    
+    <button onclick="addCourse()">إضافة الكورس</button>
+
+    <div id="courseStatus" class="status"></div>
+  </div>
+
+
+  <div class="card">
+    <h2>📚 الكورسات الموجودة</h2>
+    <div id="coursesList">جاري التحميل...</div>
+  </div>
+
+</div>
+
+</div>
+
+
+<script>
+
+const SUPABASE_URL = 'https://vpgxiovtkyyzviyrggch.supabase.co';
+
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_eCHqvh0QcBy05iHdIZ5-9w_oI7DL6Vw';
+
+const { createClient } = supabase;
+
+const supabaseClient = createClient(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY
+);
+
+
+// LOGIN
+async function login(){
+
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+
+  const status = document.getElementById('loginStatus');
+
+  status.innerText = 'جاري تسجيل الدخول...';
+
+  const { error } = await supabaseClient.auth.signInWithPassword({
+    email: email,
+    password: password
+  });
+
+  if(error){
+    status.innerText = '❌ البريد أو كلمة المرور غير صحيحة';
+    return;
+  }
+
+  await checkFounder();
+
+}
+
+
+// CHECK FOUNDER
+async function checkFounder(){
+
+  const { data: { user } } =
+    await supabaseClient.auth.getUser();
+
+  if(!user){
+    showLogin();
+    return;
+  }
+
+  const { data, error } =
+    await supabaseClient.rpc('is_valor_founder');
+
+  if(error || data !== true){
+
+    await supabaseClient.auth.signOut();
+
+    document.getElementById('loginStatus').innerText =
+      '❌ هذا الحساب ليس Founder';
+
+    showLogin();
+
+    return;
+  }
+
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+
+  loadCourses();
+}
+
+
+// SHOW LOGIN
+function showLogin(){
+
+  document.getElementById('loginBox').classList.remove('hidden');
+  document.getElementById('dashboard').classList.add('hidden');
+
+}
+
+
+// LOGOUT
+async function logout(){
+
+  await supabaseClient.auth.signOut();
+
+  showLogin();
+
+}
+
+
+// ADD COURSE
+async function addCourse(){
+
+  const title =
+    document.getElementById('courseTitle').value.trim();
+
+  const description =
+    document.getElementById('courseDescription').value.trim();
+
+  const image_url =
+    document.getElementById('courseImage').value.trim();
+
+  const price =
+    Number(document.getElementById('coursePrice').value || 0);
+
+  const status =
+    document.getElementById('courseStatus');
+
+  if(!title){
+
+    status.innerText = '❌ اكتب اسم الكورس أولًا';
+    return;
+
+  }
+
+  status.innerText = 'جاري إضافة الكورس...';
+
+  const { error } = await supabaseClient
+    .from('courses')
+    .insert({
+      title,
+      description,
+      image_url,
+      price,
+      is_published:true
+    });
+
+  if(error){
+
+    status.innerText =
+      '❌ حصل خطأ: ' + error.message;
+
+    return;
+
+  }
+
+  status.innerText = '✅ تم إضافة الكورس بنجاح';
+
+  document.getElementById('courseTitle').value = '';
+  document.getElementById('courseDescription').value = '';
+  document.getElementById('courseImage').value = '';
+  document.getElementById('coursePrice').value = '';
+
+  loadCourses();
+
+}
+
+
+// LOAD COURSES
+async function loadCourses(){
+
+  const list =
+    document.getElementById('coursesList');
+
+  list.innerHTML = 'جاري تحميل الكورسات...';
+
+  const { data, error } = await supabaseClient
+    .from('courses')
+    .select('*')
+    .order('sort_order',{ascending:true});
+
+  if(error){
+
+    list.innerHTML =
+      '❌ ' + error.message;
+
+    return;
+
+  }
+
+  if(!data || data.length === 0){
+
+    list.innerHTML =
+      '<p>لا توجد كورسات حتى الآن.</p>';
+
+    return;
+
+  }
+
+  list.innerHTML = '';
+
+  data.forEach(course => {
+
+    const div =
+      document.createElement('div');
+
+    div.className = 'course';
+
+    div.innerHTML = `
+      <h3>${escapeHtml(course.title)}</h3>
+      <p>${escapeHtml(course.description || '')}</p>
+      <p>💰 ${course.price || 0} EGP</p>
+      <p>${course.is_published ? '🟢 منشور' : '🔴 غير منشور'}</p>
+    `;
+
+    list.appendChild(div);
+
+  });
+
+}
+
+
+// SECURITY HELPER
+function escapeHtml(text){
+
+  return String(text)
+    .replaceAll('&','&amp;')
+    .replaceAll('<','&lt;')
+    .replaceAll('>','&gt;')
+    .replaceAll('"','&quot;')
+    .replaceAll("'","&#039;");
+
+}
+
+
+// CHECK EXISTING SESSION
+checkFounder();
+
+</script>
+
+</body>
+</html>
